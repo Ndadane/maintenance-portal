@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>MaintenancePortal.Core</RootNamespace>
+  </PropertyGroup>
+
+  <!--
+    Intentionally no PackageReferences here.
+    Core should not know about EF Core, PostgreSQL, ASP.NET Core, or anything
+    infrastructure-related. It only contains entities, enums, and domain rules.
+  -->
+
+</Project>
