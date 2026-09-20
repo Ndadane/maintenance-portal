@@ -170,6 +170,42 @@ public class UnitsController : ControllerBase
 		});
 	}
 
+	[HttpPatch("tenant-assignments/{assignmentId:guid}/move-out")]
+	public async Task<ActionResult<TenantAssignmentResponse>> EndAssignment(Guid assignmentId, EndAssignmentRequest request)
+	{
+		var landlordId = User.GetUserId();
+
+		var assignment = await _db.TenantAssignments
+			.Include(a => a.Unit)
+			.ThenInclude(u => u!.Property)
+			.FirstOrDefaultAsync(a => a.Id == assignmentId);
+
+		if (assignment?.Unit?.Property is null || assignment.Unit.Property.LandlordId != landlordId)
+		{
+			return NotFound();
+		}
+
+		if (request.MoveOutDate <= assignment.MoveInDate)
+		{
+			return BadRequest("MoveOutDate must be after MoveInDate.");
+		}
+
+		assignment.MoveOutDate = request.MoveOutDate;
+		await _db.SaveChangesAsync();
+
+		var tenant = await _userManager.FindByIdAsync(assignment.TenantId.ToString());
+
+		return Ok(new TenantAssignmentResponse
+		{
+			Id = assignment.Id,
+			UnitId = assignment.UnitId,
+			TenantId = assignment.TenantId,
+			TenantEmail = tenant?.Email ?? string.Empty,
+			MoveInDate = assignment.MoveInDate,
+			MoveOutDate = assignment.MoveOutDate
+		});
+	}
+
 	private static string GenerateTemporaryPassword()
 	{
 		// Satisfies Identity's configured password policy (>= 8 chars,

@@ -33,3 +33,9 @@ public class TenantAssignmentResponse
 	/// </summary>
 	public string? TemporaryPassword { get; set; }
 }
+
+public class EndAssignmentRequest
+{
+	[Required]
+	public DateOnly MoveOutDate { get; set; }
+}
