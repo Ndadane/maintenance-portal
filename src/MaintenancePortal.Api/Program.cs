@@ -1,4 +1,5 @@
 using System.Text;
+using MaintenancePortal.Infrastructure.Storage;
 using MaintenancePortal.Core.Abstractions;
 using MaintenancePortal.Core.Constants;
 using MaintenancePortal.Infrastructure.Auth;
@@ -71,6 +72,8 @@ builder.Services.AddAuthorization();
 
 // ---- App services ----
 builder.Services.AddScoped<ITokenService, JwtTokenService>();
+builder.Services.Configure<StorageOptions>(builder.Configuration.GetSection("Storage"));
+builder.Services.AddSingleton<IFileStorageService, S3FileStorageService>();
 
 builder.Services.AddControllers()
 	.AddJsonOptions(options =>

@@ -215,7 +215,7 @@ public class MaintenanceRequestsController : ControllerBase
 		return Ok(ToResponse(maintenanceRequest, maintenanceRequest.TenantAssignment.Unit));
 	}
 
-	private static bool IsAuthorized(MaintenanceRequest request, Guid userId, bool isLandlord)
+	internal static bool IsAuthorized(MaintenanceRequest request, Guid userId, bool isLandlord)
 	{
 		if (isLandlord)
 		{

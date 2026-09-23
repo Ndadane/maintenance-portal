@@ -8,6 +8,6 @@ public class RequestPhotoConfiguration : IEntityTypeConfiguration<RequestPhoto>
 {
     public void Configure(EntityTypeBuilder<RequestPhoto> builder)
     {
-        builder.Property(p => p.StorageUrl).IsRequired().HasMaxLength(1000);
+        builder.Property(p => p.StorageKey).IsRequired().HasMaxLength(1000);
     }
 }
