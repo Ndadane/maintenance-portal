@@ -9,6 +9,8 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using MaintenancePortal.Api.BackgroundServices;
+using MaintenancePortal.Infrastructure.Email;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -74,6 +76,11 @@ builder.Services.AddAuthorization();
 builder.Services.AddScoped<ITokenService, JwtTokenService>();
 builder.Services.Configure<StorageOptions>(builder.Configuration.GetSection("Storage"));
 builder.Services.AddSingleton<IFileStorageService, S3FileStorageService>();
+builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection("Email"));
+builder.Services.AddSingleton<IEmailSender, SmtpEmailSender>();
+builder.Services.AddSingleton<ChannelEmailQueue>();
+builder.Services.AddSingleton<IEmailQueue>(sp => sp.GetRequiredService<ChannelEmailQueue>());
+builder.Services.AddHostedService<EmailBackgroundService>();
 
 builder.Services.AddControllers()
 	.AddJsonOptions(options =>

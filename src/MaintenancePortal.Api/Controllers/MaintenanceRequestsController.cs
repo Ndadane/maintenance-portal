@@ -7,6 +7,7 @@ using MaintenancePortal.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using MaintenancePortal.Core.Abstractions;
 
 namespace MaintenancePortal.Api.Controllers;
 
@@ -15,11 +16,14 @@ namespace MaintenancePortal.Api.Controllers;
 [Authorize]
 public class MaintenanceRequestsController : ControllerBase
 {
-	private readonly AppDbContext _db;
 
-	public MaintenanceRequestsController(AppDbContext db)
+	private readonly AppDbContext _db;
+	private readonly IEmailQueue _emailQueue;
+
+	public MaintenanceRequestsController(AppDbContext db, IEmailQueue emailQueue)
 	{
 		_db = db;
+		_emailQueue = emailQueue;
 	}
 
 	// ---- GET /api/my-unit (Tenant only) ----
@@ -197,6 +201,8 @@ public class MaintenanceRequestsController : ControllerBase
 			return BadRequest("Provide at least one of Status or Priority to update.");
 		}
 
+		var previousStatus = maintenanceRequest.Status;
+
 		if (request.Status is not null)
 		{
 			maintenanceRequest.Status = request.Status.Value;
@@ -212,8 +218,29 @@ public class MaintenanceRequestsController : ControllerBase
 
 		await _db.SaveChangesAsync();
 
+		// Queue an email only when the status actually changed. The HTTP
+		// response doesn't wait for the email to be sent.
+		if (request.Status is not null && request.Status.Value != previousStatus)
+		{
+			var tenantEmail = await _db.Users
+				.Where(u => u.Id == maintenanceRequest.TenantAssignment.TenantId)
+				.Select(u => u.Email)
+				.FirstOrDefaultAsync();
+
+			if (!string.IsNullOrWhiteSpace(tenantEmail))
+			{
+				var unit = maintenanceRequest.TenantAssignment.Unit;
+				await _emailQueue.EnqueueAsync(new EmailMessage(
+					tenantEmail,
+					$"Update on your request: {maintenanceRequest.Title}",
+					$"Hi,\n\nYour maintenance request \"{maintenanceRequest.Title}\" ({unit.Property!.Name}, {unit.UnitLabel}) " +
+					$"changed status from {previousStatus} to {maintenanceRequest.Status}.\n\n- Maintenance Portal"));
+			}
+		}
+
 		return Ok(ToResponse(maintenanceRequest, maintenanceRequest.TenantAssignment.Unit));
 	}
+
 
 	internal static bool IsAuthorized(MaintenanceRequest request, Guid userId, bool isLandlord)
 	{
