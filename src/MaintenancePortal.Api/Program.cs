@@ -87,6 +87,11 @@ builder.Services.AddControllers()
 		options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddCors(options =>
+	options.AddPolicy("Frontend", policy => policy
+		.WithOrigins("http://localhost:5173")
+		.AllowAnyHeader()
+		.AllowAnyMethod()));
 
 var app = builder.Build();
 
@@ -112,7 +117,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-
+app.UseCors("Frontend");
 // Order matters: Authentication must run before Authorization.
 app.UseAuthentication();
 app.UseAuthorization();
