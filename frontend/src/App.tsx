@@ -8,8 +8,10 @@ import { TenantView } from "./pages/TenantView"
 import { RequestDetailPage } from "./pages/RequestDetailPage"
 import type { ReactNode } from "react"
 
-function Placeholder({ text }: { text: string }) {
-	return <p className="p-6 text-ink">{text}</p>
+function RequireAnyRole({ children }: { children: ReactNode }) {
+	const { user } = useAuth()
+	if (!user) return <Navigate to="/login" replace />
+	return <>{children}</>
 }
 
 function Home() {
@@ -19,23 +21,22 @@ function Home() {
 }
 
 function Header() {
-	const { user, logout } = useAuth()
+	const { user, isLandlord, logout } = useAuth()
 	if (!user) return null
 	return (
-		<header className="flex items-center justify-between bg-brand px-4 py-3">
-			<span className="font-medium text-white">Maintenance Portal</span>
+		<header className="flex flex-col gap-2 bg-brand px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+			<div className="flex items-center gap-2">
+				<span className="font-medium text-white">Maintenance Portal</span>
+				<span className="rounded-full bg-brand-dark px-2 py-0.5 text-xs font-medium text-brand-soft">
+					{isLandlord ? "Landlord" : "Tenant"}
+				</span>
+			</div>
 			<div className="flex items-center gap-3 text-sm text-brand-soft">
 				<span>{user.fullName}</span>
 				<button onClick={logout} className="text-white hover:underline">Sign out</button>
 			</div>
 		</header>
 	)
-}
-
-function RequireAnyRole({ children }: { children: ReactNode }) {
-	const { user } = useAuth()
-	if (!user) return <Navigate to="/login" replace />
-	return <>{children}</>
 }
 
 export default function App() {

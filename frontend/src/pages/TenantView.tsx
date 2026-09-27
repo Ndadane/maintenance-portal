@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { Link } from "react-router-dom"
 import { tenantApi, type MyUnitResponse } from "../api/tenant"
-import { ApiError } from "../api/client"
+import { friendlyError } from "../api/errorMessage"
 import type { MaintenanceRequestResponse } from "../api/types"
 import { formatDate, StatusBadge, PriorityBadge } from "../api/format"
 
@@ -12,6 +12,7 @@ export function TenantView() {
 	const [unit, setUnit] = useState<MyUnitResponse | null>(null)
 	const [requests, setRequests] = useState<MaintenanceRequestResponse[]>([])
 	const [error, setError] = useState<string | null>(null)
+	const [loading, setLoading] = useState(true)
 
 	const [title, setTitle] = useState("")
 	const [description, setDescription] = useState("")
@@ -25,11 +26,17 @@ export function TenantView() {
 			setUnit(u)
 			setRequests(reqs)
 		} catch (err) {
-			setError(err instanceof ApiError ? err.message : "Could not load your unit.")
+			setError(friendlyError(err, "Could not load your unit."))
 		}
 	}
 
-	useEffect(() => { loadAll() }, [])
+	useEffect(() => {
+		(async () => {
+			setLoading(true)
+			await loadAll()
+			setLoading(false)
+		})()
+	}, [])
 
 	async function handleSubmit(e: React.FormEvent) {
 		e.preventDefault()
@@ -43,10 +50,14 @@ export function TenantView() {
 			setPriority(PRIORITIES[0])
 			setRequests(await tenantApi.getRequests())
 		} catch (err) {
-			setError(err instanceof ApiError ? err.message : "Could not submit request.")
+			setError(friendlyError(err, "Could not submit request."))
 		} finally {
 			setSubmitting(false)
 		}
+	}
+
+	if (loading) {
+		return <p className="p-6 text-sm text-muted">Loading your unit...</p>
 	}
 
 	return (
@@ -80,7 +91,7 @@ export function TenantView() {
 						onChange={(e) => setDescription(e.target.value)}
 						className="rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-brand"
 					/>
-					<div className="flex gap-2">
+					<div className="flex flex-col gap-2 sm:flex-row">
 						<select
 							value={category}
 							onChange={(e) => setCategory(e.target.value)}
@@ -111,7 +122,7 @@ export function TenantView() {
 				<ul className="flex flex-col gap-2">
 					{requests.map((r) => (
 						<li key={r.id} className="rounded-md border border-line p-3">
-							<div className="flex items-center justify-between gap-2">
+							<div className="flex flex-wrap items-center justify-between gap-2">
 								<Link to={`/requests/${r.id}`} className="font-medium text-ink hover:text-brand">
 									{r.title}
 								</Link>
@@ -123,7 +134,9 @@ export function TenantView() {
 							<p className="mt-1 text-xs text-muted">{r.category} · {formatDate(r.createdAt)}</p>
 						</li>
 					))}
-					{requests.length === 0 && <p className="text-sm text-muted">No requests yet.</p>}
+					{requests.length === 0 && (
+						<p className="text-sm text-muted">No requests yet. Use the form above to report an issue.</p>
+					)}
 				</ul>
 			</section>
 		</div>

@@ -3,3 +3,6 @@ obj/
 .vs/
 *.user
 appsettings.Local.json
+
+frontend/node_modules/
+frontend/dist/

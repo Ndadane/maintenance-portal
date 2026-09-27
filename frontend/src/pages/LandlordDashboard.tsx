@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { Link } from "react-router-dom"
 import { landlordApi } from "../api/landlord"
-import { ApiError } from "../api/client"
+import { friendlyError } from "../api/errorMessage"
 import type { PropertyResponse, UnitResponse, MaintenanceRequestResponse } from "../api/types"
 import { formatDate, StatusBadge, PriorityBadge } from "../api/format"
 
@@ -11,15 +11,11 @@ export function LandlordDashboard() {
 	const [units, setUnits] = useState<UnitResponse[]>([])
 	const [requests, setRequests] = useState<MaintenanceRequestResponse[]>([])
 	const [error, setError] = useState<string | null>(null)
+	const [loading, setLoading] = useState(true)
 
-	// New-property form
 	const [newName, setNewName] = useState("")
 	const [newAddress, setNewAddress] = useState("")
-
-	// New-unit form
 	const [newUnitLabel, setNewUnitLabel] = useState("")
-
-	// Assign-tenant form
 	const [tenantEmail, setTenantEmail] = useState("")
 	const [moveInDate, setMoveInDate] = useState("")
 	const [assignUnitId, setAssignUnitId] = useState<string | null>(null)
@@ -29,7 +25,7 @@ export function LandlordDashboard() {
 		try {
 			setProperties(await landlordApi.getProperties())
 		} catch (err) {
-			setError(err instanceof ApiError ? err.message : "Could not load properties.")
+			setError(friendlyError(err, "Could not load properties."))
 		}
 	}
 
@@ -37,13 +33,16 @@ export function LandlordDashboard() {
 		try {
 			setRequests(await landlordApi.getRequests(propertyId))
 		} catch (err) {
-			setError(err instanceof ApiError ? err.message : "Could not load requests.")
+			setError(friendlyError(err, "Could not load requests."))
 		}
 	}
 
 	useEffect(() => {
-		loadProperties()
-		loadRequests()
+		(async () => {
+			setLoading(true)
+			await Promise.all([loadProperties(), loadRequests()])
+			setLoading(false)
+		})()
 	}, [])
 
 	async function selectProperty(id: string) {
@@ -53,7 +52,7 @@ export function LandlordDashboard() {
 		try {
 			setUnits(await landlordApi.getUnits(id))
 		} catch (err) {
-			setError(err instanceof ApiError ? err.message : "Could not load units.")
+			setError(friendlyError(err, "Could not load units."))
 		}
 		await loadRequests(id)
 	}
@@ -67,7 +66,7 @@ export function LandlordDashboard() {
 			setNewAddress("")
 			await loadProperties()
 		} catch (err) {
-			setError(err instanceof ApiError ? err.message : "Could not create property.")
+			setError(friendlyError(err, "Could not create property."))
 		}
 	}
 
@@ -80,7 +79,7 @@ export function LandlordDashboard() {
 			setNewUnitLabel("")
 			setUnits(await landlordApi.getUnits(selectedPropertyId))
 		} catch (err) {
-			setError(err instanceof ApiError ? err.message : "Could not create unit.")
+			setError(friendlyError(err, "Could not create unit."))
 		}
 	}
 
@@ -99,25 +98,29 @@ export function LandlordDashboard() {
 			setTenantEmail("")
 			setMoveInDate("")
 		} catch (err) {
-			setError(err instanceof ApiError ? err.message : "Could not assign tenant.")
+			setError(friendlyError(err, "Could not assign tenant."))
 		}
 	}
 
 	async function handleStatusChange(requestId: string, status: string) {
+		if (status === "Closed" && !window.confirm("Close this request? This usually can't be undone.")) return
 		setError(null)
 		try {
 			await landlordApi.updateStatus(requestId, status)
 			await loadRequests(selectedPropertyId ?? undefined)
 		} catch (err) {
-			setError(err instanceof ApiError ? err.message : "Could not update status.")
+			setError(friendlyError(err, "Could not update status."))
 		}
+	}
+
+	if (loading) {
+		return <p className="p-6 text-sm text-muted">Loading your properties...</p>
 	}
 
 	return (
 		<div className="mx-auto max-w-4xl p-4">
 			{error && <p className="mb-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
-			{/* Properties */}
 			<section className="mb-6 rounded-lg border border-line bg-white p-4">
 				<h2 className="mb-3 text-sm font-medium text-muted">Properties</h2>
 				<div className="mb-3 flex flex-wrap gap-2">
@@ -133,9 +136,11 @@ export function LandlordDashboard() {
 							{p.name}
 						</button>
 					))}
-					{properties.length === 0 && <p className="text-sm text-muted">No properties yet.</p>}
+					{properties.length === 0 && (
+						<p className="text-sm text-muted">No properties yet. Add your first one below to get started.</p>
+					)}
 				</div>
-				<form onSubmit={handleCreateProperty} className="flex flex-wrap gap-2">
+				<form onSubmit={handleCreateProperty} className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
 					<input
 						placeholder="Property name"
 						required
@@ -148,7 +153,7 @@ export function LandlordDashboard() {
 						required
 						value={newAddress}
 						onChange={(e) => setNewAddress(e.target.value)}
-						className="min-w-48 flex-1 rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-brand"
+						className="min-w-0 flex-1 rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-brand"
 					/>
 					<button type="submit" className="rounded-md bg-brand px-3 py-2 text-sm font-medium text-white hover:bg-brand-dark">
 						Add property
@@ -156,13 +161,12 @@ export function LandlordDashboard() {
 				</form>
 			</section>
 
-			{/* Units + tenant assignment */}
 			{selectedPropertyId && (
 				<section className="mb-6 rounded-lg border border-line bg-white p-4">
 					<h2 className="mb-3 text-sm font-medium text-muted">Units</h2>
 					<ul className="mb-3 flex flex-col gap-2">
 						{units.map((u) => (
-							<li key={u.id} className="flex items-center justify-between rounded-md border border-line px-3 py-2 text-sm">
+							<li key={u.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-line px-3 py-2 text-sm">
 								<span>{u.unitLabel}</span>
 								<button
 									onClick={() => { setAssignUnitId(u.id); setAssignResult(null) }}
@@ -172,9 +176,9 @@ export function LandlordDashboard() {
 								</button>
 							</li>
 						))}
-						{units.length === 0 && <p className="text-sm text-muted">No units yet.</p>}
+						{units.length === 0 && <p className="text-sm text-muted">No units yet. Add one below.</p>}
 					</ul>
-					<form onSubmit={handleCreateUnit} className="mb-4 flex gap-2">
+					<form onSubmit={handleCreateUnit} className="mb-4 flex flex-col gap-2 sm:flex-row">
 						<input
 							placeholder="Unit label (e.g. 2B)"
 							required
@@ -188,7 +192,7 @@ export function LandlordDashboard() {
 					</form>
 
 					{assignUnitId && (
-						<form onSubmit={handleAssignTenant} className="flex flex-wrap items-end gap-2 border-t border-line pt-3">
+						<form onSubmit={handleAssignTenant} className="flex flex-col gap-2 border-t border-line pt-3 sm:flex-row sm:flex-wrap sm:items-end">
 							<label className="flex flex-col gap-1 text-sm text-ink">
 								Tenant email
 								<input
@@ -218,7 +222,6 @@ export function LandlordDashboard() {
 				</section>
 			)}
 
-			{/* Requests */}
 			<section className="rounded-lg border border-line bg-white p-4">
 				<h2 className="mb-3 text-sm font-medium text-muted">
 					Requests {selectedPropertyId ? "(this property)" : "(all properties)"}
@@ -226,7 +229,7 @@ export function LandlordDashboard() {
 				<ul className="flex flex-col gap-2">
 					{requests.map((r) => (
 						<li key={r.id} className="rounded-md border border-line p-3">
-							<div className="flex items-center justify-between gap-2">
+							<div className="flex flex-wrap items-center justify-between gap-2">
 								<Link to={`/requests/${r.id}`} className="font-medium text-ink hover:text-brand">
 									{r.title}
 								</Link>
@@ -252,7 +255,11 @@ export function LandlordDashboard() {
 							</div>
 						</li>
 					))}
-					{requests.length === 0 && <p className="text-sm text-muted">No requests.</p>}
+					{requests.length === 0 && (
+						<p className="text-sm text-muted">
+							No requests {selectedPropertyId ? "for this property" : ""} yet. They'll appear here once a tenant submits one.
+						</p>
+					)}
 				</ul>
 			</section>
 		</div>

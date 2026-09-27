@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react"
 import { useParams, Link } from "react-router-dom"
 import { useAuth } from "../auth/AuthContext"
 import { requestDetailApi } from "../api/requestDetail"
+import { friendlyError } from "../api/errorMessage"
 import { ApiError } from "../api/client"
 import type { MaintenanceRequestResponse, CommentResponse, PhotoResponse } from "../api/types"
 import { formatDate, StatusBadge, PriorityBadge } from "../api/format"
@@ -19,6 +20,7 @@ export function RequestDetailPage() {
 	const [photos, setPhotos] = useState<PhotoResponse[]>([])
 	const [error, setError] = useState<string | null>(null)
 	const [notFound, setNotFound] = useState(false)
+	const [loading, setLoading] = useState(true)
 
 	const [commentBody, setCommentBody] = useState("")
 	const [posting, setPosting] = useState(false)
@@ -37,7 +39,9 @@ export function RequestDetailPage() {
 			setPhotos(phs)
 		} catch (err) {
 			if (err instanceof ApiError && err.status === 404) setNotFound(true)
-			else setError(err instanceof ApiError ? err.message : "Could not load this request.")
+			else setError(friendlyError(err, "Could not load this request."))
+		} finally {
+			setLoading(false)
 		}
 	}, [id])
 
@@ -45,11 +49,12 @@ export function RequestDetailPage() {
 
 	async function handleStatusChange(status?: string, priority?: string) {
 		if (!id) return
+		if (status === "Closed" && !window.confirm("Close this request? This usually can't be undone.")) return
 		setError(null)
 		try {
 			setRequest(await requestDetailApi.updateStatus(id, status, priority))
 		} catch (err) {
-			setError(err instanceof ApiError ? err.message : "Could not update the request.")
+			setError(friendlyError(err, "Could not update the request."))
 		}
 	}
 
@@ -63,7 +68,7 @@ export function RequestDetailPage() {
 			setComments((prev) => [...prev, comment])
 			setCommentBody("")
 		} catch (err) {
-			setError(err instanceof ApiError ? err.message : "Could not post comment.")
+			setError(friendlyError(err, "Could not post comment."))
 		} finally {
 			setPosting(false)
 		}
@@ -97,10 +102,14 @@ export function RequestDetailPage() {
 			const photo = await requestDetailApi.confirmPhoto(id, presign.key)
 			setPhotos((prev) => [...prev, photo])
 		} catch (err) {
-			setError(err instanceof ApiError ? err.message : "Could not upload photo.")
+			setError(friendlyError(err, "Could not upload photo. Please try again."))
 		} finally {
 			setUploading(false)
 		}
+	}
+
+	if (loading) {
+		return <p className="p-6 text-sm text-muted">Loading request...</p>
 	}
 
 	if (notFound) {
@@ -115,7 +124,7 @@ export function RequestDetailPage() {
 	}
 
 	if (!request) {
-		return <div className="mx-auto max-w-2xl p-6 text-muted">{error ?? "Loading..."}</div>
+		return <div className="mx-auto max-w-2xl p-6 text-muted">{error ?? "Something went wrong."}</div>
 	}
 
 	return (
@@ -127,7 +136,7 @@ export function RequestDetailPage() {
 			{error && <p className="mb-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
 			<div className="rounded-lg border border-line bg-white p-4">
-				<div className="flex items-center justify-between gap-2">
+				<div className="flex flex-wrap items-center justify-between gap-2">
 					<h1 className="text-lg font-medium text-ink">{request.title}</h1>
 					<div className="flex gap-2">
 						<PriorityBadge priority={request.priority} />
@@ -187,7 +196,7 @@ export function RequestDetailPage() {
 							/>
 						</a>
 					))}
-					{photos.length === 0 && <p className="text-sm text-muted">No photos yet.</p>}
+					{photos.length === 0 && <p className="text-sm text-muted">No photos yet. Add one to show the problem.</p>}
 				</div>
 				<label className="inline-block cursor-pointer rounded-md border border-line px-3 py-2 text-sm text-ink hover:border-brand">
 					{uploading ? "Uploading..." : "Add photo"}
@@ -206,7 +215,7 @@ export function RequestDetailPage() {
 				<ul className="mb-3 flex flex-col gap-2">
 					{comments.map((c) => (
 						<li key={c.id} className="rounded-md bg-page p-2">
-							<div className="flex items-center justify-between text-xs text-muted">
+							<div className="flex flex-wrap items-center justify-between gap-1 text-xs text-muted">
 								<span className="font-medium text-ink">
 									{c.authorEmail} <span className="font-normal text-muted">({c.authorRole})</span>
 								</span>
@@ -215,9 +224,9 @@ export function RequestDetailPage() {
 							<p className="mt-1 text-sm text-ink">{c.body}</p>
 						</li>
 					))}
-					{comments.length === 0 && <p className="text-sm text-muted">No comments yet.</p>}
+					{comments.length === 0 && <p className="text-sm text-muted">No comments yet. Start the conversation below.</p>}
 				</ul>
-				<form onSubmit={handleAddComment} className="flex gap-2">
+				<form onSubmit={handleAddComment} className="flex flex-col gap-2 sm:flex-row">
 					<input
 						placeholder="Write a comment..."
 						value={commentBody}
