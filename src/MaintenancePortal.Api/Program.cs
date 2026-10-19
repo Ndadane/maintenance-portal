@@ -87,9 +87,13 @@ builder.Services.AddControllers()
 		options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+var allowedOrigins = builder.Configuration
+	.GetSection("Cors:AllowedOrigins")
+	.Get<string[]>() ?? ["http://localhost:5173"];
+
 builder.Services.AddCors(options =>
 	options.AddPolicy("Frontend", policy => policy
-		.WithOrigins("http://localhost:5173")
+		.WithOrigins(allowedOrigins)
 		.AllowAnyHeader()
 		.AllowAnyMethod()));
 
